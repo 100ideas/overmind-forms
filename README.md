@@ -2,25 +2,26 @@
 
 ## 21 Feb 2019 patch notes (@100ideas)
 
-this folder is a fork of source code of the overmind-forms node package with small patch.
-- original: https://github.com/garth/overmind-forms
-- patch: https://github.com/100ideas/overmind-forms
-- demo repo: https://github.com/100ideas/overmind-forms-demo/ (see codesandbox_v1 branch)
-- [codesandbox demo](https://codesandbox.io/s/github/100ideas/overmind-forms-example/tree/codesandbox_v1)
+#### fix/disable build script partial fail if tsc finds type errors
 
-I couldn't get codesandbox to use my fork of the package in the demo app, so hence this `patch/overmind-forms` folder and `package.json` postinstall script.
+I fixed a bug in the typescript code of the `overmind-forms` package, but didn't know how to update the type definitions of the changed functions, so `tsc` started reporting errors when compiling from the source.
 
-Detail of codesandbox error: I wanted codesandbox to install using a particular branch of the github repo of my fork of `overmind-forms`, the `hack` branch.
+`tsc` exiting non-zero caused the build process to quit since the build commands are combined with bash `&&` operator. One solution is to join each command with a `||` operator and another command that will always return 0 - in this case, `echo`. Doing so allows tsc to complain but doesn't derail the build process.
+
+But I ended up just disabling the build process because it was causing problems on codesandbox.
+
+Specifically, the build process is triggered on package install by the `package.json` `prepare` script. I changed its key to `prepare_disabled` to prevent it running automatically. Seems codesandbox couldn't find typescript / babel dependencies? (not sure) when installing this package from my github repo into a `create-react-app` js project.
 
 ```json
-// in package.json
-  "dependencies": {
-    "overmind-forms": "100ideas/overmind-forms#70fdc88",  // fail
-    "overmind-forms": "100ideas/overmind-forms#hack",     // fail
-    "overmind-forms": "100ideas/overmind-forms",          // works - but is master branch
+// package.json
+"scripts": {
+  "prepare_disabled": "npm run prebuild && npm run build",
+  "prebuild": "rimraf lib && rimraf es",
+  "build:lib": "tsc --outDir lib --module commonjs  --preserveWatchOutput",
+  "build:es": "tsc --outDir es --module es2015  --preserveWatchOutput",
+  "build": "npm run build:lib || echo 'tsc returned non-zero but we will continue' && npm run build:es || echo 'tsc returned non-zero but we will continue'",
+}
 ```
-
-I also noticed codesandbox having trouble compiling the typescript source of the package on install (since the demo repo is a js create-react-app template and probably didn't have the right ts deps). So I un-gitignored the built directories (`es/`, `lib/`), added them to my repo, and tried disabling the build directives triggered by the `prepare` script in the packages' `package.json`. that also didn't work with codesandbox.
 
 ## 20 Feb 2019 patch notes (@100ideas)
 
@@ -32,12 +33,11 @@ git clone https://github.com/100ideas/overmind-forms-example.git)
 
 # get patched overmind-forms (place in parallel directory to demo)
 git clone https://github.com/100ideas/overmind-forms.git)
-git checkout --track origin/hack
 
 # build and set up local package link
 cd overmind-forms
 yarn
-yarn build
+yarn run prepare_disabled # alternatively run `yarn run build`
 yarn link
 
 # complete link
